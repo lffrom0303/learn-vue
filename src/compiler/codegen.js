@@ -4,25 +4,8 @@ const bindRE = /^:|^v-bind:/;
 const onRE = /^@|^v-on:/;
 const mustUsePropsRE = /^(value|selected|checked|muted)$/;
 
-/**
- * 根据抽象语法树(ast)生成一个函数。
- * 这个函数的作用是通过解析ast，生成相应的JavaScript代码，并封装成一个函数。
- * 在这个函数的执行环境中，`this` 指向调用 `generate` 函数时的上下文。
- *
- * @param {Object} ast - 抽象语法树。这是一个代表JavaScript代码结构的对象。
- * @returns {Function} 返回一个函数，该函数在执行时会返回根据ast生成的JavaScript代码。
- */
 export function generate(ast) {
-  // 通过genElement函数处理ast，生成相应的JavaScript代码字符串
   const code = genElement(ast);
-  // 输出调试信息，显示生成的代码字符串
-  console.log(
-    "传入ast抽象语法树，通过genElement函数处理ast，生成相应的JavaScript代码字符串",
-    code
-  );
-
-  // 创建并返回一个新函数，该函数的执行环境包含this指向的内容。
-  // 函数体中的代码是返回通过ast生成的JavaScript代码字符串。
   return new Function(`with (this) { return ${code}}`);
 }
 
@@ -61,11 +44,15 @@ function genData(el, key) {
   if (!el.attrs.length) {
     return "{}";
   }
-  let data = key ? `{key:${key},` : `{`;
-  if (el.attrsMap[":class"] || el.attrsMap["class"]) {
-    data += `class: _renderClass(${el.attrsMap[":class"]}, "${
-      el.attrsMap["class"] || ""
-    }"),`;
+  let data = "{";
+  if (key) {
+    data += `key:${key},`;
+  }
+  if (el.attrsMap[":class"]) {
+    data += `class: ${el.attrsMap[":class"]},`;
+  }
+  if (el.attrsMap["class"]) {
+    data += `staticClass: "${el.attrsMap["class"]}"`;
   }
   let attrs = `attrs:{`;
   let props = `props:{`;

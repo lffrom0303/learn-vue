@@ -3,6 +3,8 @@ import { parseText } from "./text-parser";
 const bindRE = /^:|^v-bind:/;
 const onRE = /^@|^v-on:/;
 const mustUsePropsRE = /^(value|selected|checked|muted)$/;
+const simplePathRE =
+  /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*|\['.*?'\]|\[".*?"\]|\[\d+\]|\[[A-Za-z_$][\w$]*\])*$/;
 
 export function generate(ast) {
   const code = genElement(ast);
@@ -56,27 +58,31 @@ function genData(el, key) {
   }
   let attrs = `attrs:{`;
   let props = `props:{`;
+  let events = `on:{`;
   let hasAttrs = false;
   let hasProps = false;
+  let hasEvents = false;
   for (let i = 0, l = el.attrs.length; i < l; i++) {
     let attr = el.attrs[i];
     let name = attr.name;
+    let value = attr.value;
     if (bindRE.test(name)) {
       name = name.replace(bindRE, "");
       if (name === "class") {
         continue;
       } else if (name === "style") {
-        data += `style: ${attr.value},`;
+        data += `style: ${value},`;
       } else if (mustUsePropsRE.test(name)) {
         hasProps = true;
-        props += `"${name}": (${attr.value}),`;
+        props += `"${name}": (${value}),`;
       } else {
         hasAttrs = true;
-        attrs += `"${name}": (${attr.value}),`;
+        attrs += `"${name}": (${value}),`;
       }
     } else if (onRE.test(name)) {
+      hasEvents = true;
       name = name.replace(onRE, "");
-      // TODO
+      events += genEvent(name, value);
     } else if (name !== "class") {
       hasAttrs = true;
       attrs += `"${name}": (${JSON.stringify(attr.value)}),`;
@@ -87,6 +93,9 @@ function genData(el, key) {
   }
   if (hasProps) {
     data += props.slice(0, -1) + "},";
+  }
+  if (hasEvents) {
+    data += events.slice(0, -1) + "},";
   }
   return data.replace(/,$/, "") + "}";
 }
@@ -112,15 +121,23 @@ function genText(text) {
   } else {
     const exp = parseText(text);
     if (exp) {
-      return "String(" + escapeNewlines(exp) + ")";
+      return "String(" + exp + ")";
     } else {
-      return escapeNewlines(JSON.stringify(text));
+      return JSON.stringify(text);
     }
   }
 }
 
-function escapeNewlines(str) {
-  return str.replace(/\n/g, "\\n");
+function genEvent(name, value) {
+  // TODO support modifiers
+  if (!value) {
+    return `"${name}":function(){},`;
+  }
+  if (simplePathRE.test(value)) {
+    return `"${name}":${value},`;
+  } else {
+    return `"${name}":function($event){${value}},`;
+  }
 }
 
 function getAttr(el, attr) {
